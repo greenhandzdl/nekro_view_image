@@ -192,10 +192,11 @@ async def describe_image(_ctx: AgentCtx, image_data: str) -> str:
 
     示例
     ----
+    with open("49D09B6B3EDBA13FD78BB9E60900A5EB.jpg", "rb") as f:
+        encoded_string = base64.b64encode(f.read()).decode()
     
-    describe_image(
-        "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."
-    )
+    describe_image(f"data:image/jpeg;base64,{encoded_string}")
+
 
     Return:
         "In this image we can see a dog on the sofa..."
