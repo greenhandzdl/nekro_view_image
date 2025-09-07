@@ -4,9 +4,6 @@
 的图片描述功能。插件接受 ``data:image/<format>;base64,`` 形式的图片字符串，
 仅支持 ``jpeg``、``jpg`` 与 ``png`` 三种格式，并返回模型生成的文字描述。
 
-注意：图片大小需要小于135KB
-
-
 使用方式示例（在沙盒中）::
 
     description = await describe_image(
@@ -119,9 +116,9 @@ def _validate_image_data_url(image_data: str = None) -> None:
             "图片必须是 data:image/jpeg/png;base64 格式，且仅支持 jpeg、jpg、png。"
         )
     # 对 base64 部分长度做一次检查，避免意外的超大负载
-    b64_part = image_data.split(",", 1)[1]
-    if len(b64_part) > 180_000:  # 约 135KB 的 base64 数据
-        raise ValueError("图片数据过大，请使用更小的图片或改用资产 API 上传。")
+    # b64_part = image_data.split(",", 1)[1]
+    # if len(b64_part) > 180_000:  # 约 135KB 的 base64 数据
+    #     raise ValueError("图片数据过大，请使用更小的图片或改用资产 API 上传。")
 
 
 async def _extract_description_from_response(
