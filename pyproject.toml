@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "nekro-plugin-template"
-version = "1.0.0-dev"
-description = "NekroAgent 插件模板"
-authors = ["KroMiose <li_xiangff@163.com>"]
+name = "nekro-view-image"
+version = "0.1.0"
+description = "为不具备多模态视觉能力的模型提供看懂图片的能力。"
+authors = ["greenhandzdl <https://github.com/greenhandzdl>"]
 readme = "README.md"
 packages = []
-repository = "https://github.com/KroMiose/nekro-plugin-template"
+repository = "https://github.com/greenhandzdl/nekro_view_image"
 
 
 [tool.poetry.dependencies]

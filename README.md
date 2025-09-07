@@ -1,6 +1,18 @@
-# NekroAgent 插件模板
+# nekro_view_image 插件
 
-> 一个帮助开发者快速创建 NekroAgent 插件的模板仓库。
+> 为不具备多模态视觉能力的模型提供基于 NVIDIA VLM（Vision‑Language Model）API 的图片描述功能。
+
+## 🎯 插件功能
+
+本插件为不具备多模态视觉能力的模型提供看懂图片的能力。插件接受 `data:image/<format>;base64,` 形式的图片字符串，仅支持 `jpeg`、`jpg` 与 `png` 三种格式，并返回 NVIDIA VLM 模型生成的文字描述。
+
+使用方式示例（在沙盒中）：
+
+```python
+description = await describe_image(
+    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."
+)
+```
 
 ## 🚀 快速开始
 
@@ -30,6 +42,19 @@ poetry config virtualenvs.in-project true
 # 安装所有依赖
 poetry install
 ```
+
+## ⚙️ 插件配置
+
+插件支持以下配置项：
+
+- **invoke_url**: NVIDIA VLM API 的基础 URL（不含模型路径），默认为 `https://ai.api.nvidia.com/v1/vlm`
+- **model**: 要使用的模型标识，例如 `google/paligemma`，默认为 `google/paligemma`
+- **API_KEY_REQUIRED_IF_EXECUTING_OUTSIDE_NGC**: 在非 NGC 环境下调用 API 所需的 Bearer Token
+- **content**: 发送给模型的提示词，后面会自动拼接 `<img>` 标签，默认为 "Describe the image. "
+- **max_tokens**: 模型生成的最大 token 数，默认为 512
+- **temperature**: 采样温度，控制生成文本的随机程度，默认为 1.0
+- **top_p**: Top‑p 采样阈值，默认为 0.70
+- **stream**: 是否请求流式响应。流式时返回的内容会逐行拼接，默认为 False
 
 ## 📝 插件开发指南
 
