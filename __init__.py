@@ -4,6 +4,9 @@
 的图片描述功能。插件接受 ``data:image/<format>;base64,`` 形式的图片字符串，
 仅支持 ``jpeg``、``jpg`` 与 ``png`` 三种格式，并返回模型生成的文字描述。
 
+> [!WARNING]
+> 注意：图片大小需要小于175KB
+
 使用方式示例（在沙盒中）::
 
     description = await describe_image(
@@ -53,9 +56,9 @@ class NekroViewImageConfig(ConfigBase):
         description="NVIDIA VLM API 的基础 URL（不含模型路径）。",
     )
     model: str = Field(
-        default="google/paligemma",
+        default="nvidia/neva-22b",
         title="Model",
-        description="要使用的模型标识，例如 ``google/paligemma``。",
+        description="要使用的模型标识，例如 ``google/paligemma``,``nvidia/neva-22b``,``adept/fuyu-8b``。",
     )
     API_KEY_REQUIRED_IF_EXECUTING_OUTSIDE_NGC: str = Field(
         default="",
