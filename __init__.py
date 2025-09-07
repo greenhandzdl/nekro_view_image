@@ -173,12 +173,14 @@ async def _extract_description_from_response(
 # 工具方法：描述图片
 # ----------------------------------------------------------------------
 @plugin.mount_sandbox_method(
-    SandboxMethodType.TOOL,
+    SandboxMethodType.AGENT,
     name="描述图片",
     description="使用 NVIDIA VLM 模型对提供的图片进行文字描述。",
 )
 async def describe_image(_ctx: AgentCtx, image_data: str) -> str:
-    """使用 NVIDIA VLM 对图片进行描述。
+    """
+    使用 NVIDIA VLM 对图片进行描述。
+    如果你遇到用户发送图片，你应该使用这个方法获取图片信息之后再做决定。
 
     参数
     ----------
@@ -192,6 +194,8 @@ async def describe_image(_ctx: AgentCtx, image_data: str) -> str:
 
     示例
     ----
+    import base64 # You Must Need Import It.
+
     with open("49D09B6B3EDBA13FD78BB9E60900A5EB.jpg", "rb") as f:
         encoded_string = base64.b64encode(f.read()).decode()
     
