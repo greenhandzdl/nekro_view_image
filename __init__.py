@@ -206,7 +206,8 @@ async def describe_image(_ctx: AgentCtx, image_data: str) -> str:
 
 
     Return:
-        "In this image we can see a dog on the sofa..."
+        如果执行成功，返回图片描述文本。例如，"In this image we can see a dog on the sofa..."
+        否则，返回错误提示信息。例如，HTTP 错误 500: {"type":"urn:inference-service:problem-details:internal-server-error","title":"Internal Server Error","status":500,"detail":"broken data stream when reading image file"}
 
     """
     # 1. 参数校验
