@@ -1,112 +1,266 @@
-"""这是一个示例天气查询插件
+"""nekro_view_image 插件
 
-提供指定城市的天气查询功能。
-使用 wttr.in API 获取天气数据。
+为不具备多模态视觉能力的模型提供基于 NVIDIA VLM（Vision‑Language Model）API
+的图片描述功能。插件接受 ``data:image/<format>;base64,`` 形式的图片字符串，
+仅支持 ``jpeg``、``jpg`` 与 ``png`` 三种格式，并返回模型生成的文字描述。
+
+使用方式示例（在沙盒中）::
+
+    description = await describe_image(
+        "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."
+    )
 """
 
-from typing import Dict
+from __future__ import annotations
+
+import json
+import re
+from typing import List
 
 import httpx
-from nekro_agent.api.schemas import AgentCtx
-from nekro_agent.core import logger
-from nekro_agent.services.plugin.base import ConfigBase, NekroPlugin, SandboxMethodType
 from pydantic import Field
 
-# TODO: 插件元信息，请修改为你的插件信息
-plugin = NekroPlugin(
-    name="天气查询插件",  # TODO: 插件名称
-    module_name="weather",  # TODO: 插件模块名 (如果要发布该插件，需要在 NekroAI 社区中唯一)
-    description="提供指定城市的天气查询功能",  # TODO: 插件描述
-    version="1.0.0",  # TODO: 插件版本
-    author="KroMiose",  # TODO: 插件作者
-    url="https://github.com/KroMiose/nekro-plugin-template",  # TODO: 插件仓库地址
+from nekro_agent.api.schemas import AgentCtx
+from nekro_agent.core import logger
+from nekro_agent.services.plugin.base import (
+    ConfigBase,
+    NekroPlugin,
+    SandboxMethodType,
 )
 
+# ----------------------------------------------------------------------
+# 插件实例
+# ----------------------------------------------------------------------
+plugin = NekroPlugin = NekroPlugin(
+    name="nekro_view_image",
+    module_name="nekro_view_image",
+    description="为不具备多模态视觉能力的模型提供看懂图片的能力。",
+    version="0.1.0",
+    author="greenhandzdl",
+    url="https://github.com/greenhandzdl/nekro_view_image",
+)
 
-# TODO: 插件配置，根据需要修改
+# ----------------------------------------------------------------------
+# 配置类
+# ----------------------------------------------------------------------
 @plugin.mount_config()
-class WeatherConfig(ConfigBase):
-    """天气查询配置"""
+class NekroViewImageConfig(ConfigBase):
+    """插件可配置参数"""
 
-    API_URL: str = Field(
-        default="https://wttr.in/",
-        title="天气API地址",
-        description="天气查询API的基础URL",
+    invoke_url: str = Field(
+        default="https://ai.api.nvidia.com/v1/vlm",
+        title="Invoke URL",
+        description="NVIDIA VLM API 的基础 URL（不含模型路径）。",
     )
-    TIMEOUT: int = Field(
-        default=10,
-        title="请求超时时间",
-        description="API请求的超时时间(秒)",
+    model: str = Field(
+        default="google/paligemma",
+        title="Model",
+        description="要使用的模型标识，例如 ``google/paligemma``。",
+    )
+    API_KEY_REQUIRED_IF_EXECUTING_OUTSIDE_NGC: str = Field(
+        default="",
+        title="API Key",
+        description=(
+            "在非 NGC 环境下调用 API 所需的 Bearer Token。"
+            "若为空，则不在请求头中发送 Authorization。"
+        ),
+    )
+    content: str = Field(
+        default="Describe the image. ",
+        title="Prompt Content",
+        description="发送给模型的提示词，后面会自动拼接 <img> 标签。",
+    )
+    max_tokens: int = Field(
+        default=512,
+        title="Maximum Tokens",
+        description="模型生成的最大 token 数。",
+    )
+    temperature: float = Field(
+        default=1.0,
+        title="Temperature",
+        description="采样温度，控制生成文本的随机程度。",
+    )
+    top_p: float = Field(
+        default=0.70,
+        title="Nucleus sampling probability",
+        description="Top‑p 采样阈值。",
+    )
+    stream: bool = Field(
+        default=False,
+        title="Stream",
+        description="是否请求流式响应。流式时返回的内容会逐行拼接。",
     )
 
+# 获取配置实例（类型提示有助于 IDE 自动补全）
+config: NekroViewImageConfig = plugin.get_config(NekroViewImageConfig)
 
-# 获取配置实例
-config: WeatherConfig = plugin.get_config(WeatherConfig)
 
+# ----------------------------------------------------------------------
+# 辅助函数
+# ----------------------------------------------------------------------
+def _validate_image_data_url(image_data: str = None) -> None:
+    """
+    验证 ``data:image/...;base64,`` 字符串的合法性。
 
-@plugin.mount_sandbox_method(SandboxMethodType.AGENT, name="查询天气", description="查询指定城市的实时天气信息")
-async def query_weather(_ctx: AgentCtx, city: str) -> str:
-    """查询指定城市的实时天气信息。
+    仅接受 ``jpeg``、``jpg``、``png`` 三种 MIME 类型。
 
     Args:
-        city: 需要查询天气的城市名称，例如 "北京", "London"。
+        image_data: 待验证的图片 data URL。
 
-    Returns:
-        str: 包含城市实时天气信息的字符串。查询失败时返回错误信息。
-
-    Example:
-        查询北京的天气:
-        query_weather(city="北京")
-        查询伦敦的天气:
-        query_weather(city="London")
+    Raises:
+        ValueError: 当格式不符合要求或使用了不支持的 MIME 类型时抛出。
     """
-    try:
-        async with httpx.AsyncClient(timeout=config.TIMEOUT) as client:
-            response = await client.get(f"{config.API_URL}{city}?format=j1")
-            response.raise_for_status()
-            data: Dict = response.json()
-
-        # 提取需要的天气信息
-        # wttr.in 的 JSON 结构可能包含 current_condition 列表
-        if not data.get("current_condition"):
-            logger.warning(f"城市 '{city}' 的天气数据格式不符合预期，缺少 'current_condition'")
-            return f"未能获取到城市 '{city}' 的有效天气数据，请检查城市名称是否正确。"
-
-        # 处理获取到的天气数据
-        current_condition = data["current_condition"][0]
-        temp_c = current_condition.get("temp_C")
-        feels_like_c = current_condition.get("FeelsLikeC")
-        humidity = current_condition.get("humidity")
-        weather_desc_list = current_condition.get("weatherDesc", [])
-        weather_desc = weather_desc_list[0].get("value") if weather_desc_list else "未知"
-        wind_speed_kmph = current_condition.get("windspeedKmph")
-        wind_dir = current_condition.get("winddir16Point")
-        visibility = current_condition.get("visibility")
-        pressure = current_condition.get("pressure")
-
-        # 格式化返回结果
-        result = (
-            f"城市: {city}\n"
-            f"天气状况: {weather_desc}\n"
-            f"温度: {temp_c}°C\n"
-            f"体感温度: {feels_like_c}°C\n"
-            f"湿度: {humidity}%\n"
-            f"风向: {wind_dir}\n"
-            f"风速: {wind_speed_kmph} km/h\n"
-            f"能见度: {visibility} km\n"
-            f"气压: {pressure} hPa"
+    pattern = r"^data:image/(jpeg|jpg|png);base64,([A-Za-z0-9+/=]+)$"
+    if not re.fullmatch(pattern, image_data):
+        raise ValueError(
+            "图片必须是 data:image/jpeg/png;base64 格式，且仅支持 jpeg、jpg、png。"
         )
-        logger.info(f"已查询到城市 '{city}' 的天气")
-    except Exception as e:
-        # 捕获其他所有未知异常
-        logger.exception(f"查询城市 '{city}' 天气时发生未知错误: {e}")
-        return f"查询 '{city}' 天气时发生内部错误。"
+    # 对 base64 部分长度做一次检查，避免意外的超大负载
+    b64_part = image_data.split(",", 1)[1]
+    if len(b64_part) > 180_000:  # 约 135KB 的 base64 数据
+        raise ValueError("图片数据过大，请使用更小的图片或改用资产 API 上传。")
+
+
+async def _extract_description_from_response(
+    response: httpx.Response, stream: bool
+) -> str:
+    """从 httpx.Response 中提取图片描述。"""
+    if stream:
+        # ----------------- 流式响应处理 -----------------
+        description_parts: List[str] = []
+        async for line in response.aiter_lines():
+            if not line:
+                continue
+            # SSE 格式的行通常以 "data:" 开头
+            if line.startswith("data:"):
+                line = line[len("data:") :].strip()
+            if line == "[DONE]":
+                break
+            try:
+                data = json.loads(line)
+                choices = data.get("choices", [])
+                if choices:
+                    content = choices[0].get("delta", {}).get("content")
+                    if content:
+                        description_parts.append(content)
+            except json.JSONDecodeError:
+                logger.warning(f"无法解析流中的 JSON 数据: {line}")
+                continue
+
+        description = "".join(description_parts).strip()
+        if not description:
+            return "未能从流式响应中获取图片描述。"
+        return description
     else:
-        return result
+        # ----------------- 非流式响应处理 -----------------
+        resp_json = response.json()
+        choices = resp_json.get("choices", [])
+        if not choices:
+            return "响应中未包含描述信息 (choices)。"
+
+        message = choices[0].get("message", {})
+        if not message:
+            return "响应中未包含描述信息 (message)。"
+
+        description = message.get("content", "")
+        if not description:
+            return "响应中未包含描述信息 (content)。"
+
+        return description.strip()
 
 
+# ----------------------------------------------------------------------
+# 工具方法：描述图片
+# ----------------------------------------------------------------------
+@plugin.mount_sandbox_method(
+    SandboxMethodType.TOOL,
+    name="描述图片",
+    description="使用 NVIDIA VLM 模型对提供的图片进行文字描述。",
+)
+async def describe_image(_ctx: AgentCtx, image_data: str) -> str:
+    """使用 NVIDIA VLM 对图片进行描述。
+
+    参数
+    ----------
+    image_data: str
+        ``data:image/<format>;base64,`` 形式的图片字符串，仅支持 ``jpeg``、``jpg`` 与 ``png``。
+
+    返回
+    -----
+    str
+        模型生成的图片描述文本。如果出现错误则返回错误提示信息。
+
+    示例
+    ----
+    
+    describe_image(
+        "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."
+    )
+
+    Return:
+        "In this image we can see a dog on the sofa..."
+
+    """
+    # 1. 参数校验
+    try:
+        _validate_image_data_url(image_data)
+    except ValueError as exc:
+        logger.error(f"图片数据校验失败: {exc}")
+        return f"图片格式错误: {exc}"
+
+    # 2. 构造请求 URL
+    request_url: str = f"{config.invoke_url.rstrip('/')}/{config.model.lstrip('/')}"
+
+    # 3. 构造提示词（包含图片标签）
+    prompt: str = f'{config.content}<img src="{image_data}" />'
+
+    # 4. 请求体
+    payload: dict = {
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": config.max_tokens,
+        "temperature": config.temperature,
+        "top_p": config.top_p,
+        "stream": config.stream,
+    }
+
+    # 5. 请求头
+    headers: dict = {
+        "Accept": "text/event-stream" if config.stream else "application/json",
+    }
+    if config.API_KEY_REQUIRED_IF_EXECUTING_OUTSIDE_NGC:
+        headers["Authorization"] = (
+            f"Bearer {config.API_KEY_REQUIRED_IF_EXECUTING_OUTSIDE_NGC}"
+        )
+
+    # 6. 发起请求并处理响应
+    try:
+        async with httpx.AsyncClient() as client:
+            response: httpx.Response = await client.post(
+                request_url, headers=headers, json=payload, timeout=60.0
+            )
+            response.raise_for_status()
+            return await _extract_description_from_response(response, config.stream)
+    except httpx.RequestError as exc:
+        logger.error(f"网络请求错误: {exc}")
+        return f"网络错误: {exc}"
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            f"HTTP 状态错误: {exc.response.status_code} - {exc.response.text}"
+        )
+        return (
+            f"HTTP 错误 {exc.response.status_code}: "
+            f"{exc.response.text[:200]}"  # noqa: E501
+        )
+    except Exception as exc:  # pragma: no cover
+        logger.exception(f"未知错误: {exc}")
+        return f"未知错误: {exc}"
+
+
+# ----------------------------------------------------------------------
+# 清理资源（当前插件暂无需清理的资源）
+# ----------------------------------------------------------------------
 @plugin.mount_cleanup_method()
-async def clean_up():
-    """清理插件资源"""
-    # 如果有使用数据库连接、文件句柄或其他需要释放的资源，在此处添加清理逻辑
-    logger.info("天气查询插件资源已清理。")
+async def clean_up() -> None:
+    """清理插件资源（占位实现）"""
+    # 如有需要在此关闭网络会话、清理缓存等
+    logger.info("nekro_view_image 插件已完成资源清理")
