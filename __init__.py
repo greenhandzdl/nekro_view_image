@@ -4,6 +4,9 @@
 的图片描述功能。插件接受 ``data:image/<format>;base64,`` 形式的图片字符串，
 仅支持 ``jpeg``、``jpg`` 与 ``png`` 三种格式，并返回模型生成的文字描述。
 
+注意：图片大小需要小于135KB
+
+
 使用方式示例（在沙盒中）::
 
     description = await describe_image(

@@ -2,6 +2,10 @@
 
 > 为不具备多模态视觉能力的模型提供基于 NVIDIA VLM（Vision‑Language Model）API 的图片描述功能。
 
+> [!WARNING]
+> 注意：图片大小需要小于135KB
+
+
 ## 🎯 插件功能
 
 本插件为不具备多模态视觉能力的模型提供看懂图片的能力。插件接受 `data:image/<format>;base64,` 形式的图片字符串，仅支持 `jpeg`、`jpg` 与 `png` 三种格式，并返回 NVIDIA VLM 模型生成的文字描述。
