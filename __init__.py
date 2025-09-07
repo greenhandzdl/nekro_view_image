@@ -31,8 +31,8 @@ from nekro_agent.services.plugin.base import (
 # ----------------------------------------------------------------------
 # 插件实例
 # ----------------------------------------------------------------------
-plugin = NekroPlugin = NekroPlugin(
-    name="nekro_view_image",
+plugin = NekroPlugin(
+    name="Nvida描述图片方法",
     module_name="nekro_view_image",
     description="为不具备多模态视觉能力的模型提供看懂图片的能力。",
     version="0.1.0",
@@ -174,7 +174,7 @@ async def _extract_description_from_response(
 # ----------------------------------------------------------------------
 @plugin.mount_sandbox_method(
     SandboxMethodType.AGENT,
-    name="描述图片",
+    name="图片观察工具",
     description="使用 NVIDIA VLM 模型对提供的图片进行文字描述。",
 )
 async def describe_image(_ctx: AgentCtx, image_data: str) -> str:
@@ -198,8 +198,8 @@ async def describe_image(_ctx: AgentCtx, image_data: str) -> str:
 
     with open("49D09B6B3EDBA13FD78BB9E60900A5EB.jpg", "rb") as f:
         encoded_string = base64.b64encode(f.read()).decode()
-    
-    describe_image(f"data:image/jpeg;base64,{encoded_string}")
+
+    des = describe_image(f"data:image/jpeg;base64,{encoded_string}") # 如果你确信他是jpeg的话
 
 
     Return:
